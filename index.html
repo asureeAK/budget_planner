@@ -1,79 +1,163 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Budget Planner - 50/30/20 Rule</title>
-  <link rel="stylesheet" href="style.css"/>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Budget Planner — 50/30/20</title>
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- SheetJS (XLSX) for Excel export -->
+  <!-- If you want fully offline use: download xlsx.full.min.js and reference locally -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+  <!-- jsPDF + autotable for PDF export -->
+  <!-- If you want fully offline use: download these and reference locally -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
-  <div class="container">
-    <h1>Budget Planner</h1>
-    <p class="subtitle">Plan your spending with the 50/30/20 rule or customize it!</p>
+  <main class="app">
+    <header class="app-header">
+      <h1>Budget Planner</h1>
+      <p class="muted">Default 50/30/20 rule — drag sliders or type to customize. Add expenses, then export.</p>
+    </header>
 
-    <!-- Monthly Income -->
-    <div class="input-group">
-      <label>Total Monthly Income (₹)</label>
-      <input type="number" id="income" value="50000"/>
-    </div>
+    <section class="controls">
+      <div class="card">
+        <label for="income">Monthly Income (₹)</label>
+        <input id="income" type="number" min="0" value="50000" />
 
-    <!-- Percentage Inputs -->
-    <div class="input-group percentages">
-      <div>
-        <label>Needs %</label>
-        <input type="number" id="needsPercent" value="50"/>
-      </div>
-      <div>
-        <label>Wants %</label>
-        <input type="number" id="wantsPercent" value="30"/>
-      </div>
-      <div>
-        <label>Savings %</label>
-        <input type="number" id="savingsPercent" value="20"/>
-      </div>
-    </div>
-
-    <!-- Spending Inputs -->
-    <div class="input-group">
-      <label>Spent on Needs (₹)</label>
-      <input type="number" id="needsSpent" value="20000"/>
-    </div>
-    <div class="input-group">
-      <label>Spent on Wants (₹)</label>
-      <input type="number" id="wantsSpent" value="15000"/>
-    </div>
-
-    <!-- Progress Bars -->
-    <div class="progress-container">
-      <div class="progress-item">
-        <span>Needs</span>
-        <div class="progress-bar">
-          <div id="needsProgress"></div>
+        <div class="percent-grid">
+          <div class="percent-card">
+            <label>Needs (%)</label>
+            <input id="needsRange" type="range" min="0" max="100" step="1" value="50" />
+            <input id="needsNum" type="number" min="0" max="100" value="50" />
+          </div>
+          <div class="percent-card">
+            <label>Wants (%)</label>
+            <input id="wantsRange" type="range" min="0" max="100" step="1" value="30" />
+            <input id="wantsNum" type="number" min="0" max="100" value="30" />
+          </div>
+          <div class="percent-card">
+            <label>Savings (%)</label>
+            <input id="savingsRange" type="range" min="0" max="100" step="1" value="20" />
+            <input id="savingsNum" type="number" min="0" max="100" value="20" />
+          </div>
         </div>
-        <small id="needsStatus"></small>
-      </div>
 
-      <div class="progress-item">
-        <span>Wants</span>
-        <div class="progress-bar">
-          <div id="wantsProgress"></div>
+        <div class="percent-sum">
+          <small>Total: <span id="percentTotal">100</span>%</small>
         </div>
-        <small id="wantsStatus"></small>
       </div>
 
-      <div class="progress-item">
-        <span>Savings</span>
-        <div class="progress-bar">
-          <div id="savingsProgress"></div>
+      <div class="card add-expense">
+        <h3>Add Expense</h3>
+        <form id="expenseForm">
+          <div class="row">
+            <input id="expAmount" type="number" placeholder="Amount (₹)" min="0" required />
+            <select id="expCategory" required>
+              <option value="Needs">Needs</option>
+              <option value="Wants">Wants</option>
+              <option value="Savings">Savings</option>
+            </select>
+          </div>
+          <div class="row">
+            <input id="expDesc" type="text" placeholder="Description (optional)" />
+            <input id="expDate" type="date" />
+          </div>
+          <div class="row actions">
+            <button type="submit" class="btn">Add Expense</button>
+            <button type="button" id="clearExpenses" class="btn ghost">Clear All</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section class="panels">
+      <div class="card summary">
+        <h3>Summary</h3>
+        <div class="summary-grid">
+          <div>
+            <strong>Income</strong>
+            <div>₹ <span id="incomeDisplay">50000</span></div>
+          </div>
+          <div>
+            <strong>Target Needs</strong>
+            <div>₹ <span id="targetNeeds">25000</span></div>
+          </div>
+          <div>
+            <strong>Target Wants</strong>
+            <div>₹ <span id="targetWants">15000</span></div>
+          </div>
+          <div>
+            <strong>Target Savings</strong>
+            <div>₹ <span id="targetSavings">10000</span></div>
+          </div>
         </div>
-        <small id="savingsStatus"></small>
+
+        <div class="progress-list">
+          <div class="progress-row">
+            <label>Needs <small id="needsStatus" class="status muted"></small></label>
+            <div class="progress">
+              <div id="barNeeds" class="bar needs"></div>
+            </div>
+            <div class="amounts">₹ <span id="needsTotal">0</span> / <small id="needsTargetLabel">0</small></div>
+          </div>
+
+          <div class="progress-row">
+            <label>Wants <small id="wantsStatus" class="status muted"></small></label>
+            <div class="progress">
+              <div id="barWants" class="bar wants"></div>
+            </div>
+            <div class="amounts">₹ <span id="wantsTotal">0</span> / <small id="wantsTargetLabel">0</small></div>
+          </div>
+
+          <div class="progress-row">
+            <label>Savings <small id="savingsStatus" class="status muted"></small></label>
+            <div class="progress">
+              <div id="barSavings" class="bar savings"></div>
+            </div>
+            <div class="amounts">₹ <span id="savingsTotal">0</span> / <small id="savingsTargetLabel">0</small></div>
+          </div>
+        </div>
+
+        <div id="feedback" class="feedback muted"></div>
       </div>
-    </div>
 
-    <!-- Message -->
-    <div id="feedbackMessage" class="message"></div>
-  </div>
+      <div class="card table-card">
+        <div class="table-head">
+          <h3>Expenses</h3>
+          <div class="export-buttons">
+            <button id="exportTxt" class="btn ghost">Export TXT</button>
+            <button id="exportPdf" class="btn ghost">Export PDF</button>
+            <button id="exportXlsx" class="btn">Export Excel</button>
+          </div>
+        </div>
 
+        <table id="expensesTable" class="expenses-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Amount (₹)</th>
+              <th>Category</th>
+              <th>Description</th>
+              <th>Date</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+
+      </div>
+    </section>
+    <footer class="foot muted">
+      <small>Tip: To host on GitHub Pages, push these three files to your repo and enable Pages from the main branch.</small>
+    </footer>
+  </main>
+
+  <!-- Main JS -->
   <script src="script.js"></script>
 </body>
 </html>
