@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Budget Planner - 50/30/20 Rule</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+  <div class="container">
+    <h1>Budget Planner</h1>
+    <p class="subtitle">Plan your spending with the 50/30/20 rule or customize it!</p>
+
+    <!-- Monthly Income -->
+    <div class="input-group">
+      <label>Total Monthly Income (₹)</label>
+      <input type="number" id="income" value="50000"/>
+    </div>
+
+    <!-- Percentage Inputs -->
+    <div class="input-group percentages">
+      <div>
+        <label>Needs %</label>
+        <input type="number" id="needsPercent" value="50"/>
+      </div>
+      <div>
+        <label>Wants %</label>
+        <input type="number" id="wantsPercent" value="30"/>
+      </div>
+      <div>
+        <label>Savings %</label>
+        <input type="number" id="savingsPercent" value="20"/>
+      </div>
+    </div>
+
+    <!-- Spending Inputs -->
+    <div class="input-group">
+      <label>Spent on Needs (₹)</label>
+      <input type="number" id="needsSpent" value="20000"/>
+    </div>
+    <div class="input-group">
+      <label>Spent on Wants (₹)</label>
+      <input type="number" id="wantsSpent" value="15000"/>
+    </div>
+
+    <!-- Progress Bars -->
+    <div class="progress-container">
+      <div class="progress-item">
+        <span>Needs</span>
+        <div class="progress-bar">
+          <div id="needsProgress"></div>
+        </div>
+        <small id="needsStatus"></small>
+      </div>
+
+      <div class="progress-item">
+        <span>Wants</span>
+        <div class="progress-bar">
+          <div id="wantsProgress"></div>
+        </div>
+        <small id="wantsStatus"></small>
+      </div>
+
+      <div class="progress-item">
+        <span>Savings</span>
+        <div class="progress-bar">
+          <div id="savingsProgress"></div>
+        </div>
+        <small id="savingsStatus"></small>
+      </div>
+    </div>
+
+    <!-- Message -->
+    <div id="feedbackMessage" class="message"></div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
