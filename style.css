@@ -1,94 +1,86 @@
-* {
-  box-sizing: border-box;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-}
+/* Simple, clean, responsive styling for the Budget Planner */
 
+/* Basic reset */
+* { box-sizing: border-box; }
 body {
   margin: 0;
-  padding: 0;
-  background: #f6f8fa;
-  color: #333;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  background: linear-gradient(180deg,#f7f9fb 0%, #ffffff 100%);
+  color: #1f2937;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  padding: 18px;
 }
 
-.container {
-  max-width: 600px;
-  margin: auto;
-  padding: 20px;
+/* Layout */
+.app { max-width: 1050px; margin: 0 auto; }
+.app-header { text-align: center; margin-bottom: 14px; }
+.app-header h1 { margin: 0; font-size: 1.6rem; }
+.muted { color: #6b7280; font-size: 0.95rem; }
+
+.controls { display: grid; grid-template-columns: 1fr 420px; gap: 14px; align-items: start; margin-bottom: 14px; }
+@media (max-width: 880px) { .controls { grid-template-columns: 1fr; } }
+
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 6px 18px rgba(17,24,39,0.06);
 }
 
-h1 {
-  text-align: center;
-  margin-bottom: 5px;
-}
+/* Income */
+#income { width: 100%; padding: 10px; font-size: 1rem; border-radius: 8px; border: 1px solid #e6e9ee; }
 
-.subtitle {
-  text-align: center;
-  font-size: 14px;
-  color: #666;
-  margin-bottom: 20px;
-}
+/* Percent Grid (sliders + numeric) */
+.percent-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-top: 12px; }
+@media (max-width: 600px) { .percent-grid { grid-template-columns: 1fr; } }
 
-.input-group {
-  margin-bottom: 15px;
-}
+.percent-card label { font-weight: 600; display:block; margin-bottom:6px; }
+.percent-card input[type="range"] { width: 100%; accent-color: #3b82f6; margin-bottom:6px; }
+.percent-card input[type="number"] { width: 100%; padding:8px; border-radius:6px; border:1px solid #e6e9ee; }
 
-.input-group label {
-  display: block;
-  margin-bottom: 5px;
-  font-weight: bold;
+/* Add expense form */
+.add-expense h3 { margin-top: 0; }
+.row { display:flex; gap:8px; margin-bottom:8px; }
+.row input, row select, .row select {
+  flex:1; padding:8px; border-radius:8px; border:1px solid #e6e9ee;
 }
-
-.input-group input {
-  width: 100%;
-  padding: 8px;
-  font-size: 16px;
+.row.actions { justify-content: space-between; align-items:center; }
+.btn {
+  background: #111827; color: white; border: none; padding: 9px 12px; border-radius: 8px; cursor: pointer; font-weight: 600;
 }
+.btn.ghost { background: transparent; color: #111827; border: 1px solid #e6e9ee; }
+.btn:active { transform: translateY(1px); }
 
-.percentages {
-  display: flex;
-  gap: 10px;
-}
+/* Summary */
+.summary-grid { display:grid; grid-template-columns: repeat(2,1fr); gap:8px; margin-bottom:12px; }
+@media (max-width: 480px) { .summary-grid { grid-template-columns: 1fr; } }
+.summary-grid strong { display:block; }
+.progress-list { margin-top:6px; }
+.progress-row { margin-bottom:10px; }
+.progress-row label { font-weight:600; display:flex; justify-content:space-between; }
+.progress { background:#eef2ff; height:18px; border-radius:12px; overflow:hidden; margin:6px 0; }
+.bar { height:100%; width:0%; transition: width 300ms ease; color: white; text-align:right; padding-right:8px; font-size:12px; line-height:18px; }
+.bar.needs { background: linear-gradient(90deg,#ff8a65,#ff7043); }
+.bar.wants { background: linear-gradient(90deg,#4fc3f7,#29b6f6); }
+.bar.savings { background: linear-gradient(90deg,#81c784,#66bb6a); }
+.amounts { font-size:0.9rem; color:#374151; margin-top:4px; }
 
-.percentages div {
-  flex: 1;
-}
+/* Table / Expenses */
+.table-card { margin-top: 6px; }
+.table-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+.export-buttons { display:flex; gap:8px; }
+.expenses-table { width:100%; border-collapse: collapse; font-size:0.95rem; }
+.expenses-table thead th { text-align:left; padding:8px; border-bottom:1px solid #eef2ff; color:#374151; font-weight:600; }
+.expenses-table tbody td { padding:8px; border-bottom:1px dashed #f1f5f9; vertical-align:middle; }
+.expenses-table .small { font-size:0.85rem; color:#6b7280; }
+.expenses-table .btn { padding:6px 8px; font-size:0.85rem; border-radius:6px; }
 
-.progress-container {
-  margin-top: 20px;
-}
+/* feedback */
+.feedback { margin-top:8px; font-weight:700; font-size:0.98rem; }
 
-.progress-item {
-  margin-bottom: 15px;
-}
+/* footer */
+.foot { margin-top: 12px; text-align:center; }
 
-.progress-bar {
-  background: #e0e0e0;
-  height: 20px;
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.progress-bar div {
-  height: 100%;
-  text-align: right;
-  padding-right: 5px;
-  color: white;
-  font-size: 12px;
-  line-height: 20px;
-}
-
-#needsProgress { background: #ff7043; }
-#wantsProgress { background: #29b6f6; }
-#savingsProgress { background: #66bb6a; }
-
-.message {
-  margin-top: 15px;
-  font-weight: bold;
-  text-align: center;
-}
-
-@media (max-width: 600px) {
-  .percentages {
-    flex-direction: column;
-  }
-}
+/* small helpers */
+.status { font-weight:600; }
