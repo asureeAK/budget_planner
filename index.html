@@ -3,161 +3,741 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Budget Planner — 50/30/20</title>
+  <title>Advanced Budget Planner — 50/30/20</title>
 
-  <!-- Stylesheet -->
-  <link rel="stylesheet" href="style.css" />
-
-  <!-- SheetJS (XLSX) for Excel export -->
-  <!-- If you want fully offline use: download xlsx.full.min.js and reference locally -->
+  <!-- ====== External libs for exports (client-side) ======
+       - SheetJS (xlsx) for Excel export
+       - jsPDF + autotable for PDF export
+     If you want fully offline hosting, download these files and reference locally.
+  -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-
-  <!-- jsPDF + autotable for PDF export -->
-  <!-- If you want fully offline use: download these and reference locally -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+  <style>
+    /* ---------- Basic / Reset ---------- */
+    :root{
+      --bg:#f3f6fb;
+      --card:#ffffff;
+      --muted:#6b7280;
+      --text:#0f172a;
+      --needs:#3b82f6;
+      --wants:#fb923c;
+      --savings:#10b981;
+      --danger:#ef4444;
+      --glass: rgba(255,255,255,0.6);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%; margin:0; font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:var(--bg); color:var(--text); -webkit-font-smoothing:antialiased;}
+    a{color:inherit}
+    main.app{max-width:1100px; margin:18px auto; padding:14px}
+
+    /* ---------- Header ---------- */
+    header.app-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+    header.app-header h1{margin:0;font-size:1.5rem}
+    header.app-header .subtitle{color:var(--muted);font-size:0.95rem}
+
+    /* ---------- Layout ---------- */
+    .layout{display:grid;grid-template-columns:320px 1fr;gap:14px}
+    @media (max-width:880px){.layout{grid-template-columns:1fr}}
+
+    /* ---------- Cards ---------- */
+    .card{background:var(--card);border-radius:12px;padding:14px;box-shadow:0 8px 22px rgba(15,23,42,0.06)}
+    .small{font-size:0.9rem;color:var(--muted)}
+
+    /* ---------- Sidebar controls ---------- */
+    .sidebar .section{margin-bottom:12px}
+    label.block{display:block;font-weight:600;margin-bottom:6px}
+    input[type=number], input[type=text], select, .percent-input {width:100%;padding:10px;border-radius:8px;border:1px solid #e6e9ee;font-size:14px}
+    input[type=date]{padding:8px;border-radius:8px;border:1px solid #e6e9ee}
+    .row{display:flex;gap:8px;align-items:center}
+    .row.col{flex-direction:column}
+
+    /* slider + numeric combo */
+    .percent-row{display:flex;gap:8px;align-items:center}
+    .percent-row input[type=range]{flex:1;background:transparent}
+    .percent-row input[type=number]{width:72px;padding:8px;border-radius:8px;border:1px solid #e6e9ee}
+
+    /* add expense */
+    .btn{background:#0f172a;color:white;padding:8px 12px;border-radius:8px;border:none;cursor:pointer;font-weight:700}
+    .btn.ghost{background:transparent;color:var(--text);border:1px solid #e6e9ee;font-weight:600}
+    .btn.small{padding:6px 8px;font-size:0.9rem}
+    .muted{color:var(--muted)}
+
+    /* ---------- Main content ---------- */
+    .summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+    @media (max-width:600px){.summary-grid{grid-template-columns:1fr}}
+    .summary-card{padding:12px;border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.65), rgba(255,255,255,0.45));}
+    .summary-card h4{margin:0 0 6px;font-size:0.95rem}
+    .summary-value{font-weight:800;font-size:1.05rem}
+
+    /* progress */
+    .progress-row{margin-bottom:10px}
+    .progress-row label{display:flex;justify-content:space-between;align-items:center;font-weight:700}
+    .progress{background:#eef2ff;height:20px;border-radius:999px;overflow:hidden;margin-top:6px}
+    .bar{height:100%;width:0%;transition:width 400ms cubic-bezier(.2,.9,.3,1);display:flex;align-items:center;justify-content:flex-end;padding-right:8px;color:white;font-weight:700;font-size:12px}
+    .bar.needs{background:linear-gradient(90deg,var(--needs),#2563eb)}
+    .bar.wants{background:linear-gradient(90deg,var(--wants),#f97316)}
+    .bar.savings{background:linear-gradient(90deg,var(--savings),#059669)}
+    .status-text{font-weight:700;margin-left:8px}
+
+    /* feedback bubble */
+    .toast{position:fixed;right:18px;bottom:18px;z-index:60;min-width:220px;padding:10px 14px;border-radius:10px;color:white;font-weight:700;box-shadow:0 10px 30px rgba(2,6,23,0.18);transform:translateY(20px);opacity:0;transition:all 260ms ease}
+    .toast.show{transform:translateY(0);opacity:1}
+    .toast.warn{background:var(--danger)}
+    .toast.warn2{background:#d97706}
+    .toast.good{background:linear-gradient(90deg,#10b981,#047857)}
+
+    /* table */
+    .table-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+    .export-buttons{display:flex;gap:8px}
+    table.expenses{width:100%;border-collapse:collapse;font-size:0.95rem}
+    table.expenses thead th{background:transparent;text-align:left;padding:10px 8px;border-bottom:1px solid #eef2ff;font-weight:700;cursor:pointer}
+    table.expenses tbody td{padding:10px 8px;border-bottom:1px dashed #f1f5f9;vertical-align:middle}
+    table.expenses tbody tr:hover{background:rgba(15,23,42,0.02)}
+    .tag{display:inline-block;padding:4px 8px;border-radius:999px;font-weight:700;color:white;font-size:0.82rem}
+    .tag.needs{background:var(--needs)}
+    .tag.wants{background:var(--wants)}
+    .tag.savings{background:var(--savings)}
+    .actions .btn{padding:6px 8px}
+
+    /* editable cell highlight */
+    td.editing{background:#fff7ed}
+
+    /* responsive tweaks */
+    @media (max-width:880px){
+      .table-head { flex-direction: column; align-items: flex-start; gap:8px }
+    }
+
+    /* subtle footer */
+    footer{margin-top:14px;text-align:center;color:var(--muted);font-size:0.9rem}
+  </style>
 </head>
 <body>
   <main class="app">
     <header class="app-header">
-      <h1>Budget Planner</h1>
-      <p class="muted">Default 50/30/20 rule — drag sliders or type to customize. Add expenses, then export.</p>
+      <div>
+        <h1>Budget Planner</h1>
+        <div class="subtitle">Default 50/30/20 rule — drag sliders or type to customize. Add & edit expenses, export as TXT/PDF/XLSX.</div>
+      </div>
+      <div class="muted">Tip: Double-click table cells to edit. Click headers to sort.</div>
     </header>
 
-    <section class="controls">
-      <div class="card">
-        <label for="income">Monthly Income (₹)</label>
-        <input id="income" type="number" min="0" value="50000" />
-
-        <div class="percent-grid">
-          <div class="percent-card">
-            <label>Needs (%)</label>
-            <input id="needsRange" type="range" min="0" max="100" step="1" value="50" />
-            <input id="needsNum" type="number" min="0" max="100" value="50" />
-          </div>
-          <div class="percent-card">
-            <label>Wants (%)</label>
-            <input id="wantsRange" type="range" min="0" max="100" step="1" value="30" />
-            <input id="wantsNum" type="number" min="0" max="100" value="30" />
-          </div>
-          <div class="percent-card">
-            <label>Savings (%)</label>
-            <input id="savingsRange" type="range" min="0" max="100" step="1" value="20" />
-            <input id="savingsNum" type="number" min="0" max="100" value="20" />
-          </div>
+    <div class="layout">
+      <!-- ===== SIDEBAR ===== -->
+      <aside class="sidebar">
+        <div class="card section">
+          <label class="block">Monthly Income (₹)</label>
+          <input id="income" type="number" min="0" value="50000" />
+          <div style="margin-top:8px" class="small">Example: 50,000</div>
         </div>
 
-        <div class="percent-sum">
-          <small>Total: <span id="percentTotal">100</span>%</small>
-        </div>
-      </div>
+        <div class="card section">
+          <label class="block">Allocation (sliders)</label>
 
-      <div class="card add-expense">
-        <h3>Add Expense</h3>
-        <form id="expenseForm">
-          <div class="row">
-            <input id="expAmount" type="number" placeholder="Amount (₹)" min="0" required />
-            <select id="expCategory" required>
-              <option value="Needs">Needs</option>
-              <option value="Wants">Wants</option>
-              <option value="Savings">Savings</option>
-            </select>
-          </div>
-          <div class="row">
-            <input id="expDesc" type="text" placeholder="Description (optional)" />
-            <input id="expDate" type="date" />
-          </div>
-          <div class="row actions">
-            <button type="submit" class="btn">Add Expense</button>
-            <button type="button" id="clearExpenses" class="btn ghost">Clear All</button>
-          </div>
-        </form>
-      </div>
-    </section>
-
-    <section class="panels">
-      <div class="card summary">
-        <h3>Summary</h3>
-        <div class="summary-grid">
-          <div>
-            <strong>Income</strong>
-            <div>₹ <span id="incomeDisplay">50000</span></div>
-          </div>
-          <div>
-            <strong>Target Needs</strong>
-            <div>₹ <span id="targetNeeds">25000</span></div>
-          </div>
-          <div>
-            <strong>Target Wants</strong>
-            <div>₹ <span id="targetWants">15000</span></div>
-          </div>
-          <div>
-            <strong>Target Savings</strong>
-            <div>₹ <span id="targetSavings">10000</span></div>
-          </div>
-        </div>
-
-        <div class="progress-list">
-          <div class="progress-row">
-            <label>Needs <small id="needsStatus" class="status muted"></small></label>
-            <div class="progress">
-              <div id="barNeeds" class="bar needs"></div>
+          <div style="margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <div style="font-weight:700">Needs <span style="color:var(--muted);font-weight:600;margin-left:8px" id="needsLabelSmall">(50%)</span></div>
+              <div class="small" id="needsTargetSmall">₹ 0</div>
             </div>
-            <div class="amounts">₹ <span id="needsTotal">0</span> / <small id="needsTargetLabel">0</small></div>
+            <div class="percent-row">
+              <input id="needsRange" type="range" min="0" max="100" step="1" value="50" />
+              <input id="needsNum" type="number" min="0" max="100" value="50" />
+            </div>
           </div>
 
-          <div class="progress-row">
-            <label>Wants <small id="wantsStatus" class="status muted"></small></label>
-            <div class="progress">
-              <div id="barWants" class="bar wants"></div>
+          <div style="margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <div style="font-weight:700">Wants <span style="color:var(--muted);font-weight:600;margin-left:8px" id="wantsLabelSmall">(30%)</span></div>
+              <div class="small" id="wantsTargetSmall">₹ 0</div>
             </div>
-            <div class="amounts">₹ <span id="wantsTotal">0</span> / <small id="wantsTargetLabel">0</small></div>
+            <div class="percent-row">
+              <input id="wantsRange" type="range" min="0" max="100" step="1" value="30" />
+              <input id="wantsNum" type="number" min="0" max="100" value="30" />
+            </div>
           </div>
 
-          <div class="progress-row">
-            <label>Savings <small id="savingsStatus" class="status muted"></small></label>
-            <div class="progress">
-              <div id="barSavings" class="bar savings"></div>
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <div style="font-weight:700">Savings <span style="color:var(--muted);font-weight:600;margin-left:8px" id="savingsLabelSmall">(20%)</span></div>
+              <div class="small" id="savingsTargetSmall">₹ 0</div>
             </div>
-            <div class="amounts">₹ <span id="savingsTotal">0</span> / <small id="savingsTargetLabel">0</small></div>
+            <div class="percent-row">
+              <input id="savingsRange" type="range" min="0" max="100" step="1" value="20" />
+              <input id="savingsNum" type="number" min="0" max="100" value="20" />
+            </div>
+          </div>
+
+          <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+            <div class="small">Total:</div>
+            <div id="percentTotal" class="small">100%</div>
           </div>
         </div>
 
-        <div id="feedback" class="feedback muted"></div>
-      </div>
+        <div class="card section">
+          <label class="block">Add Expense</label>
+          <form id="expenseForm">
+            <div class="row" style="margin-bottom:8px">
+              <input id="expAmount" type="number" placeholder="Amount (₹)" min="0" required />
+              <select id="expCategory">
+                <option value="Needs">Needs</option>
+                <option value="Wants">Wants</option>
+                <option value="Savings">Savings</option>
+              </select>
+            </div>
+            <div class="row" style="margin-bottom:8px">
+              <input id="expDesc" type="text" placeholder="Description (optional)" />
+              <input id="expDate" type="date" />
+            </div>
+            <div class="row">
+              <button class="btn" type="submit">Add Expense</button>
+              <button type="button" id="clearAllBtn" class="btn ghost">Clear All</button>
+            </div>
+          </form>
+        </div>
+      </aside>
 
-      <div class="card table-card">
-        <div class="table-head">
-          <h3>Expenses</h3>
-          <div class="export-buttons">
-            <button id="exportTxt" class="btn ghost">Export TXT</button>
-            <button id="exportPdf" class="btn ghost">Export PDF</button>
-            <button id="exportXlsx" class="btn">Export Excel</button>
+      <!-- ===== MAIN ===== -->
+      <section class="main">
+        <div class="card">
+          <div class="summary-grid" aria-hidden>
+            <div class="summary-card">
+              <h4>Income</h4>
+              <div class="summary-value">₹ <span id="incomeDisplay">50,000</span></div>
+            </div>
+            <div class="summary-card">
+              <h4>Targets</h4>
+              <div class="small">Needs: ₹ <span id="targetNeeds">0</span></div>
+              <div class="small">Wants: ₹ <span id="targetWants">0</span></div>
+              <div class="small">Savings: ₹ <span id="targetSavings">0</span></div>
+            </div>
+            <div class="summary-card">
+              <h4>Quick Actions</h4>
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <button id="exportTxt" class="btn small">Export TXT</button>
+                <button id="exportPdf" class="btn small ghost">Export PDF</button>
+                <button id="exportXlsx" class="btn small">Export Excel</button>
+              </div>
+              <div style="margin-top:8px" class="small">Data saves in your browser (localStorage).</div>
+            </div>
+          </div>
+
+          <div style="margin-top:12px">
+            <div class="progress-row">
+              <label>Needs <span id="needsStatus" class="small muted"></span></label>
+              <div class="progress"><div id="barNeeds" class="bar needs"> </div></div>
+              <div class="small" style="margin-top:6px">₹ <span id="needsTotal">0</span> / <small id="needsTargetLabel">0</small></div>
+            </div>
+
+            <div class="progress-row">
+              <label>Wants <span id="wantsStatus" class="small muted"></span></label>
+              <div class="progress"><div id="barWants" class="bar wants"> </div></div>
+              <div class="small" style="margin-top:6px">₹ <span id="wantsTotal">0</span> / <small id="wantsTargetLabel">0</small></div>
+            </div>
+
+            <div class="progress-row">
+              <label>Savings <span id="savingsStatus" class="small muted"></span></label>
+              <div class="progress"><div id="barSavings" class="bar savings"> </div></div>
+              <div class="small" style="margin-top:6px">₹ <span id="savingsTotal">0</span> / <small id="savingsTargetLabel">0</small></div>
+            </div>
+
+            <div style="margin-top:10px" id="feedback" class="small muted"></div>
           </div>
         </div>
 
-        <table id="expensesTable" class="expenses-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Amount (₹)</th>
-              <th>Category</th>
-              <th>Description</th>
-              <th>Date</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+        <div class="card" style="margin-top:12px">
+          <div class="table-head">
+            <h3 style="margin:0">Expenses</h3>
+            <div class="export-buttons">
+              <button id="sortDateBtn" class="btn ghost small">Sort: Date</button>
+              <button id="sortCategoryBtn" class="btn ghost small">Sort: Category</button>
+            </div>
+          </div>
 
-      </div>
-    </section>
-    <footer class="foot muted">
-      <small>Tip: To host on GitHub Pages, push these three files to your repo and enable Pages from the main branch.</small>
-    </footer>
+          <table class="expenses" id="expensesTable">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Amount (₹)</th>
+                <th>Category</th>
+                <th>Description</th>
+                <th>Date</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <footer class="muted" style="margin-top:12px">Save this file to GitHub Pages or open locally. To make exports work offline, host the XLSX & jsPDF scripts locally.</footer>
   </main>
 
-  <!-- Main JS -->
-  <script src="script.js"></script>
+  <!-- floating toasts -->
+  <div id="toast" class="toast"></div>
+
+  <script>
+  /* ===== Advanced Budget Planner Single-File JS =====
+     Features:
+     - 50/30/20 default but customizable via sliders + numbers
+     - Sliders keep total approx 100 by redistributing
+     - Add/edit/delete expenses (double-click to edit)
+     - Sorting of table
+     - Animated progress bars with color coding and exceed warnings
+     - LocalStorage persistence
+     - Export TXT, PDF (jsPDF+autotable), Excel (SheetJS)
+  */
+
+  /* ===== DOM refs ===== */
+  const incomeEl = document.getElementById('income');
+  const incomeDisplay = document.getElementById('incomeDisplay');
+
+  const needsRange = document.getElementById('needsRange');
+  const wantsRange = document.getElementById('wantsRange');
+  const savingsRange = document.getElementById('savingsRange');
+
+  const needsNum = document.getElementById('needsNum');
+  const wantsNum = document.getElementById('wantsNum');
+  const savingsNum = document.getElementById('savingsNum');
+
+  const needsLabelSmall = document.getElementById('needsLabelSmall');
+  const wantsLabelSmall = document.getElementById('wantsLabelSmall');
+  const savingsLabelSmall = document.getElementById('savingsLabelSmall');
+
+  const percentTotalEl = document.getElementById('percentTotal');
+
+  const targetNeeds = document.getElementById('targetNeeds');
+  const targetWants = document.getElementById('targetWants');
+  const targetSavings = document.getElementById('targetSavings');
+
+  const needsTargetLabel = document.getElementById('needsTargetLabel');
+  const wantsTargetLabel = document.getElementById('wantsTargetLabel');
+  const savingsTargetLabel = document.getElementById('savingsTargetLabel');
+
+  const needsTotalEl = document.getElementById('needsTotal');
+  const wantsTotalEl = document.getElementById('wantsTotal');
+  const savingsTotalEl = document.getElementById('savingsTotal');
+
+  const barNeeds = document.getElementById('barNeeds');
+  const barWants = document.getElementById('barWants');
+  const barSavings = document.getElementById('barSavings');
+
+  const needsStatus = document.getElementById('needsStatus');
+  const wantsStatus = document.getElementById('wantsStatus');
+  const savingsStatus = document.getElementById('savingsStatus');
+
+  const feedbackEl = document.getElementById('feedback');
+
+  const expenseForm = document.getElementById('expenseForm');
+  const expAmount = document.getElementById('expAmount');
+  const expCategory = document.getElementById('expCategory');
+  const expDesc = document.getElementById('expDesc');
+  const expDate = document.getElementById('expDate');
+
+  const expensesTableBody = document.querySelector('#expensesTable tbody');
+
+  const exportTxtBtn = document.getElementById('exportTxt');
+  const exportPdfBtn = document.getElementById('exportPdf');
+  const exportXlsxBtn = document.getElementById('exportXlsx');
+
+  const clearAllBtn = document.getElementById('clearAllBtn');
+  const toastEl = document.getElementById('toast');
+
+  const sortDateBtn = document.getElementById('sortDateBtn');
+  const sortCategoryBtn = document.getElementById('sortCategoryBtn');
+
+  /* ===== State & persistence keys ===== */
+  const STORAGE_KEY = 'advanced_budget_planner_v1';
+  let state = {
+    income: 50000,
+    percents: { needs:50, wants:30, savings:20 },
+    expenses: [], // {id, amount, category, desc, date}
+    sort: { by:'date', dir:'desc' } // default sort
+  };
+
+  /* ===== Utilities ===== */
+  const currency = n => (Math.round(n)).toLocaleString();
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+
+  function saveState(){
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e){}
+  }
+  function loadState(){
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(raw) state = JSON.parse(raw);
+    } catch(e){ console.error('load error',e) }
+  }
+
+  /* ===== Toasts ===== */
+  let toastTimer = null;
+  function showToast(text, type='warn', ms=3500){
+    toastEl.className = `toast ${type==='good'?'good': type==='warn2'?'warn2':'warn'}`;
+    toastEl.textContent = text;
+    toastEl.classList.add('show');
+    if(toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=>{ toastEl.classList.remove('show'); }, ms);
+  }
+
+  /* ===== Slider redistribution logic =====
+     When user adjusts one slider, redistribute delta across the other two proportionally.
+     This keeps total ~100 while preventing negatives.
+  */
+  function redistribute(changedKey, newValue){
+    newValue = Math.max(0, Math.min(100, Math.round(newValue)));
+    const p = {...state.percents};
+    const oldValue = p[changedKey];
+    let delta = newValue - oldValue;
+    if(delta === 0) return;
+    const others = Object.keys(p).filter(k=>k!==changedKey);
+    let a = p[others[0]], b = p[others[1]], totalOthers = a + b;
+    if(totalOthers === 0){ a = b = 50; totalOthers = 100; }
+    // subtract delta proportionally
+    let newA = a - (delta * (a / totalOthers));
+    let newB = b - (delta * (b / totalOthers));
+    // clamp
+    newA = Math.max(0, Math.min(100, Math.round(newA)));
+    newB = Math.max(0, Math.min(100, Math.round(newB)));
+    newValue = Math.max(0, Math.min(100, Math.round(newValue)));
+    // adjust drift
+    let total = newA + newB + newValue;
+    const drift = total - 100;
+    newValue = Math.round(newValue - drift);
+    // set
+    state.percents[changedKey] = newValue;
+    state.percents[others[0]] = newA;
+    state.percents[others[1]] = newB;
+    syncPercentsToInputs();
+    updateAll();
+  }
+
+  /* ===== Sync percents UI elements with state ===== */
+  function syncPercentsToInputs(){
+    needsRange.value = state.percents.needs;
+    wantsRange.value = state.percents.wants;
+    savingsRange.value = state.percents.savings;
+    needsNum.value = state.percents.needs;
+    wantsNum.value = state.percents.wants;
+    savingsNum.value = state.percents.savings;
+    needsLabelSmall.textContent = `(${state.percents.needs}%)`;
+    wantsLabelSmall.textContent = `(${state.percents.wants}%)`;
+    savingsLabelSmall.textContent = `(${state.percents.savings}%)`;
+    percentTotalEl.textContent = (state.percents.needs + state.percents.wants + state.percents.savings) + '%';
+  }
+
+  /* ===== Add Expense ===== */
+  expenseForm.addEventListener('submit', (ev)=>{
+    ev.preventDefault();
+    const amt = Number(expAmount.value) || 0;
+    if(amt <= 0){ showToast('Enter a positive amount','warn2'); return; }
+    const e = {
+      id: uid(),
+      amount: amt,
+      category: expCategory.value,
+      desc: expDesc.value.trim(),
+      date: expDate.value || new Date().toISOString().slice(0,10)
+    };
+    state.expenses.push(e);
+    expAmount.value = ''; expDesc.value=''; expDate.value='';
+    saveState(); updateAll();
+    showToast('Expense added', 'good', 2000);
+  });
+
+  /* ===== Delete all expenses ===== */
+  clearAllBtn.addEventListener('click', ()=>{
+    if(!confirm('Clear all expenses?')) return;
+    state.expenses = [];
+    saveState(); updateAll();
+    showToast('All expenses cleared', 'warn2', 2200);
+  });
+
+  /* ===== Sorting buttons ===== */
+  sortDateBtn.addEventListener('click', ()=>{
+    if(state.sort.by === 'date'){ state.sort.dir = state.sort.dir==='asc'?'desc':'asc'; }
+    else { state.sort.by = 'date'; state.sort.dir = 'desc'; }
+    updateAll();
+  });
+  sortCategoryBtn.addEventListener('click', ()=>{
+    if(state.sort.by === 'category'){ state.sort.dir = state.sort.dir==='asc'?'desc':'asc'; }
+    else { state.sort.by = 'category'; state.sort.dir = 'asc'; }
+    updateAll();
+  });
+
+  /* ===== Exports ===== */
+  exportTxtBtn.addEventListener('click', exportTxt);
+  exportPdfBtn.addEventListener('click', exportPdf);
+  exportXlsxBtn.addEventListener('click', exportXlsx);
+
+  function exportTxt(){
+    const now = new Date().toLocaleString();
+    const lines = [];
+    lines.push('Budget Planner Report');
+    lines.push('Generated: ' + now);
+    lines.push('');
+    lines.push(`Income: ₹ ${currency(state.income)}`);
+    lines.push(`Percentages: Needs ${state.percents.needs}% | Wants ${state.percents.wants}% | Savings ${state.percents.savings}%`);
+    lines.push('');
+    lines.push(`Targets:`);
+    lines.push(`  Needs: ₹ ${currency(targetValue('needs'))}`);
+    lines.push(`  Wants: ₹ ${currency(targetValue('wants'))}`);
+    lines.push(`  Savings: ₹ ${currency(targetValue('savings'))}`);
+    lines.push('');
+    lines.push('Expenses:');
+    if(state.expenses.length===0) lines.push('  (No expenses)');
+    else state.expenses.forEach((e,i)=>{
+      lines.push(`${i+1}. ₹ ${currency(e.amount)} | ${e.category} | ${e.desc || '-'} | ${e.date || '-'}`);
+    });
+    const blob = new Blob([lines.join('\n')], {type:'text/plain;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `budget-${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function exportPdf(){
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({unit:'pt',format:'a4'});
+    doc.setFontSize(14); doc.text('Budget Planner Report',40,50);
+    doc.setFontSize(10); doc.text('Income: ₹ '+currency(state.income), 40,68);
+    doc.text(`Percentages: Needs ${state.percents.needs}% | Wants ${state.percents.wants}% | Savings ${state.percents.savings}%`, 40,84);
+    // table
+    const head = [['#','Amount (₹)','Category','Description','Date']];
+    const body = state.expenses.map((e,i)=>[i+1, currency(e.amount), e.category, e.desc || '-', e.date || '-']);
+    doc.autoTable({ startY: 110, head, body, styles:{fontSize:9} });
+    doc.save(`budget-${Date.now()}.pdf`);
+  }
+
+  function exportXlsx(){
+    const wb = XLSX.utils.book_new();
+    const rows = [];
+    rows.push(['Budget Planner Report']);
+    rows.push(['Generated', new Date().toLocaleString()]);
+    rows.push([]);
+    rows.push(['Income', state.income]);
+    rows.push(['Needs %', state.percents.needs]);
+    rows.push(['Wants %', state.percents.wants]);
+    rows.push(['Savings %', state.percents.savings]);
+    rows.push([]);
+    rows.push(['Expenses']);
+    rows.push(['#','Amount','Category','Description','Date']);
+    state.expenses.forEach((e,i)=>rows.push([i+1, e.amount, e.category, e.desc || '-', e.date || '-']));
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, 'Report');
+    XLSX.writeFile(wb, `budget-${Date.now()}.xlsx`);
+  }
+
+  /* ===== Helpers for calculations ===== */
+  function targetValue(kind){
+    return Math.round((state.percents[kind]/100) * state.income);
+  }
+  function totalsByCategory(){
+    let n=0,w=0,s=0;
+    state.expenses.forEach(e=>{
+      if(e.category==='Needs') n += e.amount;
+      else if(e.category==='Wants') w += e.amount;
+      else if(e.category==='Savings') s += e.amount;
+    });
+    return {needs:n,wants:w,savings:s};
+  }
+
+  /* ===== Render table & summary ===== */
+  function renderExpensesTable(){
+    // Sort copy
+    let list = [...state.expenses];
+    if(state.sort.by === 'date'){
+      list.sort((a,b)=>{
+        if(!a.date) return 1; if(!b.date) return -1;
+        return state.sort.dir === 'asc' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date)
+      });
+    } else if(state.sort.by === 'category'){
+      list.sort((a,b)=>{
+        return state.sort.dir === 'asc' ? a.category.localeCompare(b.category) : b.category.localeCompare(a.category)
+      });
+    }
+
+    expensesTableBody.innerHTML = '';
+    list.forEach((e, idx)=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${idx+1}</td>
+        <td class="cell amount" data-id="${e.id}">₹ ${currency(e.amount)}</td>
+        <td class="cell category" data-id="${e.id}"><span class="tag ${e.category.toLowerCase()}">${e.category}</span></td>
+        <td class="cell desc" data-id="${e.id}">${e.desc || '-'}</td>
+        <td class="cell date" data-id="${e.id}">${e.date || '-'}</td>
+        <td class="actions"><button class="btn ghost small" data-delete="${e.id}">Delete</button></td>
+      `;
+      expensesTableBody.appendChild(tr);
+    });
+
+    // delete handlers
+    expensesTableBody.querySelectorAll('button[data-delete]').forEach(btn=>{
+      btn.addEventListener('click', (ev)=>{
+        const id = ev.currentTarget.getAttribute('data-delete');
+        if(!confirm('Delete this expense?')) return;
+        state.expenses = state.expenses.filter(x=>x.id !== id);
+        saveState(); updateAll();
+        showToast('Expense deleted','warn2',1600);
+      });
+    });
+
+    // editable cells: double click to edit
+    expensesTableBody.querySelectorAll('td.cell').forEach(td=>{
+      td.addEventListener('dblclick', (ev)=>{
+        makeCellEditable(ev.currentTarget);
+      });
+    });
+  }
+
+  function makeCellEditable(td){
+    const id = td.getAttribute('data-id');
+    if(!id) return;
+    td.classList.add('editing');
+    const type = td.classList.contains('amount') ? 'amount' : td.classList.contains('desc') ? 'desc' : td.classList.contains('date') ? 'date' : 'other';
+    const original = td.textContent.trim();
+    let input;
+    if(type === 'amount'){
+      input = document.createElement('input'); input.type='number'; input.value = state.expenses.find(e=>e.id===id).amount; input.min=0;
+      input.style.width='100%';
+    } else if(type === 'date'){
+      input = document.createElement('input'); input.type='date'; input.value = state.expenses.find(e=>e.id===id).date || '';
+    } else {
+      input = document.createElement('input'); input.type='text'; input.value = (state.expenses.find(e=>e.id===id).desc || '');
+    }
+    td.innerHTML = ''; td.appendChild(input);
+    input.focus();
+
+    // Save on blur or Enter
+    function commit(){
+      const val = input.value;
+      const idx = state.expenses.findIndex(e=>e.id===id);
+      if(idx === -1) return;
+      if(type === 'amount'){ const n = Number(val)||0; state.expenses[idx].amount = n; }
+      else if(type === 'date'){ state.expenses[idx].date = val; }
+      else { state.expenses[idx].desc = val; }
+      td.classList.remove('editing');
+      saveState(); updateAll();
+    }
+    input.addEventListener('blur', commit);
+    input.addEventListener('keydown', (ev)=>{
+      if(ev.key === 'Enter'){ ev.preventDefault(); input.blur(); }
+      if(ev.key === 'Escape'){ td.classList.remove('editing'); updateAll(); }
+    });
+  }
+
+  function updateSummaryAndBars(){
+    // income
+    incomeDisplay.textContent = currency(state.income);
+
+    // targets
+    targetNeeds.textContent = currency(targetValue('needs'));
+    targetWants.textContent = currency(targetValue('wants'));
+    targetSavings.textContent = currency(targetValue('savings'));
+
+    needsTargetLabel.textContent = currency(targetValue('needs'));
+    wantsTargetLabel.textContent = currency(targetValue('wants'));
+    savingsTargetLabel.textContent = currency(targetValue('savings'));
+
+    // totals
+    const totals = totalsByCategory();
+    needsTotalEl.textContent = currency(totals.needs);
+    wantsTotalEl.textContent = currency(totals.wants);
+    savingsTotalEl.textContent = currency(totals.savings);
+
+    // progress percent
+    const needsPct = targetValue('needs') === 0 ? 0 : Math.round((totals.needs / targetValue('needs')) * 100);
+    const wantsPct = targetValue('wants') === 0 ? 0 : Math.round((totals.wants / targetValue('wants')) * 100);
+    const savingsPct = targetValue('savings') === 0 ? 0 : Math.round((totals.savings / targetValue('savings')) * 100);
+
+    barNeeds.style.width = Math.min(100, needsPct) + '%';
+    barNeeds.textContent = needsPct > 0 ? needsPct + '%' : '';
+    barWants.style.width = Math.min(100, wantsPct) + '%';
+    barWants.textContent = wantsPct > 0 ? wantsPct + '%' : '';
+    barSavings.style.width = Math.min(100, savingsPct) + '%';
+    barSavings.textContent = savingsPct > 0 ? savingsPct + '%' : '';
+
+    // statuses and feedback
+    needsStatus.textContent = totals.needs > targetValue('needs') ? 'Exceeded' : '';
+    wantsStatus.textContent = totals.wants > targetValue('wants') ? 'Exceeded' : '';
+    savingsStatus.textContent = totals.savings < targetValue('savings') ? 'Below target' : '';
+
+    if(totals.needs > targetValue('needs') && totals.wants > targetValue('wants')){
+      feedbackEl.textContent = 'Careful — both Needs and Wants exceeded targets!';
+      feedbackEl.style.color = 'var(--danger)';
+      showToast('Needs & Wants exceeded!', 'warn', 2400);
+    } else if(totals.needs > targetValue('needs')){
+      feedbackEl.textContent = 'You’ve exceeded your Needs budget!';
+      feedbackEl.style.color = 'var(--danger)';
+      // no toast flood: only show occasionally
+    } else if(totals.wants > targetValue('wants')){
+      feedbackEl.textContent = 'You’ve exceeded your Wants budget!';
+      feedbackEl.style.color = 'var(--danger)';
+    } else if(totals.savings < targetValue('savings')){
+      feedbackEl.textContent = "You're missing your future proof.";
+      feedbackEl.style.color = '#d97706';
+    } else if(totals.needs < targetValue('needs') && totals.wants < targetValue('wants') && totals.savings >= targetValue('savings')){
+      feedbackEl.textContent = "Congrats, you're rocking it!";
+      feedbackEl.style.color = '#065f46';
+      showToast("Congrats — you're rocking it!", 'good', 2000);
+    } else {
+      feedbackEl.textContent = '';
+    }
+  }
+
+  /* ===== Wiring inputs & events ===== */
+  // income
+  incomeEl.addEventListener('input', ()=>{
+    state.income = Math.max(0, Number(incomeEl.value) || 0);
+    saveState(); updateAll();
+  });
+
+  // slider + number pairs
+  needsRange.addEventListener('input', (e)=>redistribute('needs', Number(e.target.value)));
+  wantsRange.addEventListener('input', (e)=>redistribute('wants', Number(e.target.value)));
+  savingsRange.addEventListener('input', (e)=>redistribute('savings', Number(e.target.value)));
+
+  needsNum.addEventListener('input', (e)=>redistribute('needs', Number(e.target.value)));
+  wantsNum.addEventListener('input', (e)=>redistribute('wants', Number(e.target.value)));
+  savingsNum.addEventListener('input', (e)=>redistribute('savings', Number(e.target.value)));
+
+  /* ===== Initialize with demo data on first load ===== */
+  function seedDemoIfEmpty(){
+    if(state.expenses.length === 0){
+      state.expenses = [
+        {id: uid(), amount: 12000, category:'Needs', desc:'Rent', date:'2025-07-01'},
+        {id: uid(), amount: 4500, category:'Needs', desc:'Groceries', date:'2025-07-03'},
+        {id: uid(), amount: 3000, category:'Wants', desc:'Dining out', date:'2025-07-08'},
+        {id: uid(), amount: 2000, category:'Wants', desc:'Movies/Subscriptions', date:'2025-07-15'},
+        {id: uid(), amount: 5000, category:'Savings', desc:'Emergency fund', date:'2025-07-20'}
+      ];
+    }
+  }
+
+  /* ===== Update everything ===== */
+  function updateAll(){
+    syncPercentsToInputs();
+    incomeEl.value = state.income;
+    incomeDisplay.textContent = currency(state.income);
+    renderExpensesTable();
+    updateSummaryAndBars();
+    saveState();
+  }
+
+  /* ===== Startup ===== */
+  (function init(){
+    loadState();
+    // if no percents found (older versions), set defaults
+    if(!state.percents) state.percents = {needs:50,wants:30,savings:20};
+    if(!state.income) state.income = 50000;
+    seedDemoIfEmpty();
+    syncPercentsToInputs();
+    updateAll();
+  })();
+
+  /* ===== Keyboard accessibility: Enter add expense ===== */
+  expAmount.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ expenseForm.requestSubmit(); } });
+
+  </script>
 </body>
 </html>
